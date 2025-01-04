@@ -14,7 +14,7 @@ conn = sqlite3.connect('data/users.db')
 cursor = conn.cursor()
 
 # URL for Ollama Embeddings
-LLM_URL = "https://ecf6-34-70-83-158.ngrok-free.app"
+LLM_URL = "https://77bb-35-231-42-212.ngrok-free.app"
 
 # Define request model
 class UserRequest(BaseModel):
