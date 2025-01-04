@@ -1,7 +1,10 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form
+from typing import List
 from pydantic import BaseModel
 import sqlite3
 import pandas as pd
+import uuid
+from embeddings import Embeddings
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -10,11 +13,16 @@ app = FastAPI()
 conn = sqlite3.connect('data/users.db')
 cursor = conn.cursor()
 
+# URL for Ollama Embeddings
+LLM_URL = "https://ecf6-34-70-83-158.ngrok-free.app"
 
 # Define request model
 class UserRequest(BaseModel):
     email: str
     password: str
+    company_name: str
+
+class AddDocument(BaseModel):
     company_name: str
 
 # FastAPI endpoint to add users
@@ -47,3 +55,16 @@ def get_user(email: str):
     if len(data) == 0:
         raise HTTPException(status_code=404, detail="User not found")
     return {"result": data}
+
+@app.post("/add_document/")
+async def upload_files(company_name: str = Form(...), file: UploadFile = File(...)):
+    job_id = str(uuid.uuid4())
+    with open(f"./data/"+job_id+".pdf", "wb") as f:
+        f.write(await file.read())
+    file_path = f"./data/"+job_id+".pdf"
+    embd = Embeddings(llm_url=LLM_URL)
+    vector_store = embd.load_documents(file_path=file_path, 
+                                       chunk_size=2048, chunk_overlap=200, 
+                                        company_name=company_name, use_existing=True)
+    
+    return {"success": True, "job_id": job_id, "company_name": company_name}
