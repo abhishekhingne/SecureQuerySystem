@@ -6,6 +6,9 @@ from langchain_community.embeddings import OllamaEmbeddings
 from langchain.document_loaders import PyPDFLoader
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
+from langchain.chains import ConversationChain
+from langgraph.checkpoint.memory import MemorySaver
+from langchain.memory import ConversationBufferMemory
 from typing_extensions import TypedDict
 from typing import List
 from langchain.schema import Document
@@ -38,6 +41,7 @@ class AdvancedRAG:
             """,
             input_variables=["question", "company_name"],
         )
+
         self.entitlement_chain = entitlement_prompt | self.llm | JsonOutputParser()
 
         # Prompt to grade the retrieved documents
@@ -59,7 +63,7 @@ class AdvancedRAG:
         rag_generate_prompt = PromptTemplate(
             template="""You are an assistant for question-answering tasks. 
             Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know. 
-            Use three sentences maximum and keep the answer concise. Make sure Answer is in markdown format and do not mention anything about the figures, charts or any visualisation.
+            Use three sentences maximum and keep the answer concise. Do not mention anything about the figures, charts or any visualisation.
             If you do not know the company name then ask the follow-up question to the user to provide the company name.
             Question: {question} 
             Context: {context} 
@@ -99,6 +103,7 @@ class AdvancedRAG:
         )
 
         self.answer_grader = answer_grader_prompt | self.llm | JsonOutputParser()
+
 
     # Define State
     class GraphState(TypedDict):
@@ -212,15 +217,19 @@ class AdvancedRAG:
                 "not useful": END,
             },
         )
-        app = self.workflow.compile()
+        memory = MemorySaver()
+        app = self.workflow.compile(checkpointer=memory)
         return app
 
-    def execute_graph(self, question, company_name):
+    def execute_graph(self, question, company_name, email):
+        print(question)
         entitlement_match = self.entitlement_chain.invoke({"question": question, "company_name": company_name})
         if entitlement_match["match"].lower() == "yes":
             inputs = {"question": question, "company_name": company_name}
+            print(email)
+            config = {"configurable": {"thread_id": email}}
             app = self.build_graph()
-            for output in app.stream(inputs):
+            for output in app.stream(inputs, config):
                 for key, value in output.items():
                     # Node
                     print(f"Node '{key}':")
@@ -229,4 +238,4 @@ class AdvancedRAG:
                 print("\n---\n")
             return value
         else:
-            return "You're not allowed to access the company report of this {} company".format(", ".join(company_name))
+            return {"generation": "You're not allowed to access the company report of this company"}
