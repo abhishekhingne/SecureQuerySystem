@@ -20,7 +20,68 @@ import os
 load_dotenv()
 
 class AdvancedRAG:
+    """
+    A class implementing an advanced Retrieval-Augmented Generation (RAG) workflow with document retrieval, grading, 
+    response generation, and validation functionalities.
+
+    Attributes:
+        url (str): URL of the LLM service.
+        llm (ChatGroq): The LLM instance for processing prompts.
+        vector_store: The vector store instance for similarity-based document retrieval.
+        workflow (StateGraph): A workflow object to manage state transitions in RAG operations.
+
+    Prompts:
+        entitlement_prompt: Validates a user's entitlement to access information for specific companies.
+        retriever_prompt: Grades the relevance of retrieved documents to a user query.
+        rag_generate_prompt: Generates a concise answer based on retrieved context.
+        hallucination_prompt: Validates whether the generated answer is grounded in the retrieved context.
+        answer_grader_prompt: Assesses the alignment of the generated answer with the user question.
+
+    Methods:
+        __init__(llm_url, vector_store):
+            Initializes the RAG system with the LLM URL and vector store.
+
+        retrieve(state: dict) -> dict:
+            Retrieves documents relevant to a given question and filters them by company name.
+
+        generate(state: dict) -> dict:
+            Generates a concise response based on the retrieved documents and the query.
+
+        grade_documents(state: dict) -> dict:
+            Grades the relevance of retrieved documents and filters out irrelevant ones.
+
+        default_reply(state: dict) -> dict:
+            Provides a default reply when the system cannot generate a valid response.
+
+        grade_generation(state: dict) -> str:
+            Grades the generated response for hallucination and relevance to the query.
+
+        add_nodes():
+            Adds nodes to the RAG workflow for different stages of processing.
+
+        build_graph() -> StateGraph:
+            Builds and compiles the workflow graph for managing RAG operations.
+
+        execute_graph(question: str, company_name: list, email: str) -> dict:
+            Executes the RAG workflow for a given question, company names, and user email.
+
+    Example Usage:
+        >>> vector_store = YourVectorStoreInstance()
+        >>> rag_system = AdvancedRAG(llm_url="http://your-llm-service-url", vector_store=vector_store)
+        >>> result = rag_system.execute_graph(
+        ...     question="What is the market growth rate for XYZ Corp?",
+        ...     company_name=["XYZ Corp"],
+        ...     email="user@example.com"
+        ... )
+    """
     def __init__(self, llm_url, vector_store) -> None:
+        """
+        Initializes the AdvancedRAG system.
+
+        Args:
+            llm_url (str): The URL of the LLM service.
+            vector_store: A vector store instance for similarity-based document retrieval.
+        """
         self.url = llm_url
         self.llm = ChatGroq(model="llama-3.3-70b-versatile", 
                             temperature=0.0, 
@@ -114,6 +175,15 @@ class AdvancedRAG:
     
     # Nodes
     def retrieve(self, state):
+        """
+        Retrieves documents relevant to the question and filters them based on the company name.
+
+        Args:
+            state (dict): The current state containing the query and company names.
+
+        Returns:
+            dict: Updated state containing retrieved documents.
+        """
         print("---RETRIEVE---")
         question = state["question"]
         company_name = state["company_name"]
@@ -134,6 +204,15 @@ class AdvancedRAG:
         return {"documents": documents, "question": question}
     
     def generate(self, state):
+        """
+        Generates a response based on the retrieved documents and the query.
+
+        Args:
+            state (dict): The current state containing the query and documents.
+
+        Returns:
+            dict: Updated state containing the generated response.
+        """
         print("---GENERATE---")
         question = state["question"]
         documents = state["documents"]
@@ -143,6 +222,15 @@ class AdvancedRAG:
         return {"documents": documents, "question": question, "generation": generation}
     
     def grade_documents(self, state):
+        """
+        Grades the relevance of retrieved documents and filters irrelevant ones.
+
+        Args:
+            state (dict): The current state containing the query and documents.
+
+        Returns:
+            dict: Updated state with filtered relevant documents.
+        """
         print("---CHECK DOCUMENT RELEVANCE TO QUESTION---")
         question = state["question"]
         documents = state["documents"]
@@ -163,6 +251,15 @@ class AdvancedRAG:
         return {"documents": filtered_docs, "question": question}
 
     def default_reply(self, state):
+        """
+        Provides a default reply when the system cannot generate a valid response.
+
+        Args:
+            state (dict): The current state.
+
+        Returns:
+            dict: Default response.
+        """
         print("---DEFAULT REPLY---")
         question = state["question"]
         documents = state["documents"]
@@ -170,6 +267,15 @@ class AdvancedRAG:
         return {"documents": documents, "question": question, "generation": "Sorry, I cannot answer this question. It is beyond my capability."}
 
     def grade_generation(self, state):
+        """
+        Grades the generated response for hallucination and alignment with the query.
+
+        Args:
+            state (dict): The current state containing the query, documents, and response.
+
+        Returns:
+            str: Grading result indicating whether the response is useful or supported.
+        """
         print("---CHECK HALLUCINATIONS---")
         question = state["question"]
         documents = state["documents"]
@@ -196,6 +302,9 @@ class AdvancedRAG:
             return "not supported"
     
     def add_nodes(self):
+        """
+        Adds nodes to the workflow for different RAG stages.
+        """
         self.workflow = StateGraph(self.GraphState)
 
         # Define the nodes
@@ -204,6 +313,13 @@ class AdvancedRAG:
         self.workflow.add_node("generate", self.generate) # generatae
 
     def build_graph(self):
+        """
+        Builds and compiles the workflow graph for managing RAG operations.
+
+        Returns:
+            StateGraph: The compiled workflow graph.
+        """
+
         self.add_nodes()
         self.workflow.set_entry_point("retrieve")
         self.workflow.add_edge("retrieve", "grade_documents")
@@ -222,7 +338,17 @@ class AdvancedRAG:
         return app
 
     def execute_graph(self, question, company_name, email):
-        print(question)
+        """
+        Executes the RAG workflow for a given question, company names, and email.
+
+        Args:
+            question (str): The user query.
+            company_name (list): List of company names to filter the documents.
+            email (str): User email for identification in the workflow.
+
+        Returns:
+            dict: The final response generated by the workflow.
+        """
         entitlement_match = self.entitlement_chain.invoke({"question": question, "company_name": company_name})
         if entitlement_match["match"].lower() == "yes":
             inputs = {"question": question, "company_name": company_name}
