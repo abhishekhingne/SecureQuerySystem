@@ -2,6 +2,8 @@
 
 This repository contains the source code and implementation details for a chatbot designed to answer questions from earnings reports. The chatbot employs a Retrieval-Augmented Generation (RAG) methodology and ensures access control based on user privileges for specific reports.
 
+Watch the screen recording of the application's functionality [here](images/screen_recording.mp4).
+
 ## Solution Architecture
 
 The chatbot solution is built using the following components:
