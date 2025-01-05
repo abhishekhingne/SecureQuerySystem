@@ -42,8 +42,9 @@ def add_user(request: UserRequest):
 
     with sqlite3.connect('data/users.db') as conn:
         cursor = conn.cursor()
-        cursor.execute('''INSERT INTO USERS VALUES ({}, {}, {})'''.format(request.email, request.password, request.company_name))
-        cursor.commit()
+        print('''INSERT INTO USERS VALUES ("{}", "{}", {})'''.format(request.email, request.password, request.company_name))
+        cursor.execute('''INSERT INTO USERS VALUES ("{}", "{}", "{}")'''.format(request.email, request.password, request.company_name))
+        conn.commit()
 
     # Return status
     return {"message": "User added successfully"}
@@ -53,7 +54,7 @@ def add_user(request: UserRequest):
 def get_user(email: str):
     with sqlite3.connect('data/users.db') as conn:
         cursor = conn.cursor()
-        p = cursor.execute('''select * from users where email={}'''.format(email))
+        p = cursor.execute('''select * from users where email="{}"'''.format(email))
         col_names = [i[0] for i in cursor.description]
         data = p.fetchall()
     df = pd.DataFrame(data)
