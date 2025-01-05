@@ -6,6 +6,11 @@ import pandas as pd
 import uuid
 from embeddings import Embeddings
 from advanced_rag import AdvancedRAG
+from dotenv import load_dotenv
+import os
+
+# Load .env file
+load_dotenv()
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -15,7 +20,7 @@ conn = sqlite3.connect('data/users.db')
 cursor = conn.cursor()
 
 # URL for Ollama Embeddings
-LLM_URL = "https://09c0-34-105-80-233.ngrok-free.app"
+LLM_URL = os.getenv("LLM_URL")
 
 # Define request model
 class UserRequest(BaseModel):
