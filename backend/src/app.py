@@ -5,6 +5,7 @@ import sqlite3
 import pandas as pd
 import uuid
 from embeddings import Embeddings
+from advanced_rag import AdvancedRAG
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -14,7 +15,7 @@ conn = sqlite3.connect('data/users.db')
 cursor = conn.cursor()
 
 # URL for Ollama Embeddings
-LLM_URL = "https://77bb-35-231-42-212.ngrok-free.app"
+LLM_URL = "https://09c0-34-105-80-233.ngrok-free.app"
 
 # Define request model
 class UserRequest(BaseModel):
@@ -22,8 +23,10 @@ class UserRequest(BaseModel):
     password: str
     company_name: str
 
-class AddDocument(BaseModel):
-    company_name: str
+class Chat(BaseModel):
+    email :  str
+    query : str
+    company_name: List[str]
 
 # FastAPI endpoint to add users
 @app.post("/add_user/")
@@ -68,3 +71,16 @@ async def upload_files(company_name: str = Form(...), file: UploadFile = File(..
                                         company_name=company_name, use_existing=True)
     
     return {"success": True, "job_id": job_id, "company_name": company_name}
+
+# FastAPI endpoint to chat
+@app.post("/chat/")
+def chat(request: Chat):
+    question = request.query
+    company_name = request.company_name
+    email = request.email
+    embd = Embeddings(llm_url=LLM_URL)
+    vector_store = embd.get_vector_store()
+    rag = AdvancedRAG(llm_url=LLM_URL, vector_store=vector_store)
+    result = rag.execute_graph(question=question, company_name=company_name, email=email)
+    print(result)
+    return result
